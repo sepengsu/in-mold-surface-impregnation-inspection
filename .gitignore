@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.cache/
+outputs/training/
+outputs/inference/
+outputs/releases/
+
+# Local secrets
+.env
+config/roboflow_api_upload.yaml
+
+# Dataset files
+data/*
+!data/Mono/
+!data/Mono/**

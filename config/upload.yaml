@@ -1,0 +1,36 @@
+roboflow_upload:
+  name: 0915_mono_10000us
+  source: data/0915_data
+  output: data/roboflow_upload/0915_mono_10000us
+  zip: data/roboflow_upload/0915_mono_10000us.zip
+
+  select:
+    filename_prefix: mono_
+    exposure: 10000us
+    extensions:
+      - .png
+      - .jpg
+      - .jpeg
+      - .webp
+      - .bmp
+      - .avif
+      - .heic
+      - .heif
+
+  exclude:
+    filename_prefixes:
+      - color_
+
+  filename:
+    flatten: true
+    include_source_path: true
+    sanitize: true
+
+  expected:
+    image_count: 26
+
+  roboflow:
+    upload_method: web_zip
+    api_key_env: ROBOFLOW_API_KEY
+    workspace: null
+    project: null

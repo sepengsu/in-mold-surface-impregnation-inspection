@@ -1,0 +1,23 @@
+# Fixed native-resolution ROI. Replace these example coordinates for your fixture.
+roi:
+  x: 0
+  y: 0
+  width: 2000
+  height: 1200
+
+clahe:
+  enabled: true
+  clip_limit: 2.0
+  tile_grid_size: [8, 8]
+
+tiling:
+  patch_size: 256
+  stride: 128
+
+output:
+  # Relative to THIS YAML file; ../data is the repository's data directory.
+  root_dir: ../data
+  save_roi: true
+  save_clahe: true
+  save_tiles: false
+  save_metadata: true
