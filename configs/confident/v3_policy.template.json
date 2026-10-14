@@ -1,0 +1,15 @@
+{
+  "approved": false,
+  "reviewer": "",
+  "selection_basis": "Train-Audit-Dev only; never Gold or Audit-Check",
+  "rules": {
+    "0_to_1": {"enabled": false, "min_proposal_probability": 0.9, "max_self_confidence": 0.1},
+    "1_to_0": {"enabled": false, "min_proposal_probability": 0.9, "max_self_confidence": 0.1}
+  },
+  "check_operating_target": {
+    "minimum_case_bootstrap_precision_lower": 0.9,
+    "minimum_cases_per_enabled_direction": 3,
+    "minimum_confirmed_pixels_per_enabled_direction": 100,
+    "note": "Prospective operational example, not a verified optimum or a success guarantee. Freeze before Check."
+  }
+}

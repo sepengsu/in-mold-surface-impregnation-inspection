@@ -1,0 +1,62 @@
+# Existing frozen changed_v2 PNGs are used directly; no CL / CLAHE rerun.
+geometry:
+  horizontal_flip: true
+  vertical_flip: false
+  rotate180: false
+  integer_crop: false
+  assumption: "Horizontal reflection preserves defect identity; disable if illumination/mesh direction forbids it."
+  crop_policy: "Already 256x256 frozen GT: no new context, padding, resize or interpolation."
+photometric:
+  probability: 0.30
+  methods: [brightness, contrast, gamma]
+  brightness: [0.90, 1.10]
+  contrast: [0.90, 1.10]
+  gamma: [0.90, 1.10]
+  max_added_saturation: 0.02
+sampling:
+  ratios: {random: 0.50, small: 0.25, hard_negative: 0.25}
+  normal_proxy: "Zero-defect GT tiles ranked by gradient energy and bright reflections; not model-confirmed false positives."
+  hard_negative_top_fraction: 0.50
+components:
+  connectivity: 8
+  small_min_area: null
+  small_max_area: null
+  definition: "Train area q10 (minimum) and q90 rounded up to candidate bin 16/64/256 (maximum); no Test-based tuning."
+  matching_iou: 0.50
+copy_paste:
+  probability: 0.20
+  donor_policy: original_train_gt
+  donor_locality: same_capture
+  donor_attempts: 4
+  max_donors: 4096
+  background_margin: 6
+  min_background_pixels: 32
+  placement_attempts: 40
+  max_mean_difference: 0.04
+  max_orientation_degrees: 15
+  min_orientation_coherence: 0.20
+  max_coherence_difference: 0.35
+  min_background_correlation: 0.65
+  max_background_difference: 0.05
+  candidate_trials: 256
+training:
+  model: unetpp_resnet18
+  epochs: 100
+  learning_rate: 0.001
+  micro_batch_size: 2
+  effective_batch_size: 16
+  seeds: [42, 43, 44]
+  repeat_top_k: 2
+  threshold: 0.5
+  workers: 0
+  pin_memory: false
+  activation_checkpointing: true
+  amp: true
+  early_stopping: "Disabled for every arm to keep the optimizer update budget equal; select best Validation Dice."
+  optimizer: "Existing AdamW lr=0.001 weight_decay=0.0001 foreach=False"
+  scheduler: "Existing ReduceLROnPlateau val loss, factor=0.5 patience=5"
+resources:
+  memory_budget_mib: 4096
+  min_free_ram_mib: 2048
+  vram_budget_mib: 4096
+  min_free_vram_mib: 1024

@@ -1,0 +1,33 @@
+{
+  "protocol": "changed_v3_gold72_spatial_tile_holdout_v1",
+  "data": "data/changed_v3",
+  "gold": "data/gold",
+  "seeds": [42, 43, 44],
+  "epochs": 500,
+  "patience": 20,
+  "batch_size": 16,
+  "base_channels": 32,
+  "learning_rate": 0.001,
+  "device": "cuda",
+  "amp": true,
+  "workers": 0,
+  "pin_memory": false,
+  "persistent_workers": false,
+  "gradient_accumulation_steps": 1,
+  "ram_budget_mib": 4096,
+  "vram_budget_mib": 4096,
+  "min_free_ram_mib": 1024,
+  "min_free_vram_mib": 0,
+  "threshold": 0.5,
+  "connectivity": 8,
+  "component_iou_threshold": 0.25,
+  "conditions": {
+    "M0": {"model": "unet4", "loss": "bce_dice", "augmentation": "Aug0"},
+    "M1": {"model": "unet4", "loss": "bce_tversky", "augmentation": "Aug0"},
+    "M2": {"model": "unet3", "loss": "bce_dice", "augmentation": "Aug0"},
+    "M2S": {"model": "unet3_silu", "loss": "bce_dice", "augmentation": "Aug0"},
+    "M3": {"model": "resunet3", "loss": "bce_dice", "augmentation": "Aug0"},
+    "M4a": {"model": "nested3", "loss": "bce_dice", "augmentation": "Aug0"},
+    "M4b": {"model": "nested3_ds", "loss": "bce_dice", "augmentation": "Aug0"}
+  }
+}

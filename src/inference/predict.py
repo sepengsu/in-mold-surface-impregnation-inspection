@@ -4,7 +4,6 @@ import argparse
 import csv
 from datetime import datetime
 import hashlib
-import io
 import json
 import math
 from pathlib import Path
@@ -59,19 +58,31 @@ def latest_checkpoint(training_root):
 
 def load_checkpoint(path, device):
     # This loader accepts the architecture and preprocessing saved by our trainer.
-    raw = Path(path).read_bytes()
-    checkpoint = torch.load(io.BytesIO(raw), map_location="cpu", weights_only=True)
-    expected = {"architecture": "grayscale_unet", "label": "Exposure", "mask_rule": "alpha > 0",
+    checkpoint = torch.load(path, map_location="cpu", weights_only=True, mmap=True)
+    expected = {"label": "Exposure", "mask_rule": "alpha > 0",
                 "normalization": "uint8 / 255"}
     for key, value in expected.items():
         if checkpoint.get(key) != value:
             raise ValueError(f"Unsupported checkpoint {key}: {checkpoint.get(key)!r}")
-    model = UNet(checkpoint["base_channels"])
+    if checkpoint.get('architecture') == 'grayscale_segmentation_benchmark':
+        from src.training.architectures import build_model
+        model = build_model(checkpoint['model_spec'])
+    elif checkpoint.get('architecture') == 'grayscale_unet':
+        model = UNet(checkpoint['base_channels'])
+    else:
+        raise ValueError(f"Unsupported checkpoint architecture: {checkpoint.get('architecture')!r}")
     model.load_state_dict(checkpoint["model_state_dict"], strict=True)
-    model.to(device).eval()
     # Release optimizer buffers: inference does not need them on CPU or GPU.
     metadata = {key: checkpoint[key] for key in ("epoch", "threshold", "base_channels", "smoke_test")}
-    metadata["sha256"] = hashlib.sha256(raw).hexdigest()
+    if 'model_spec' in checkpoint:
+        metadata['model_spec'] = checkpoint['model_spec']
+    del checkpoint
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(block)
+    metadata["sha256"] = digest.hexdigest()
+    model.to(device).eval()
     return model, metadata
 
 

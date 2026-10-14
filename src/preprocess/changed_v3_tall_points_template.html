@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>changed_v3 · P1/P2/P3 256×512</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eef2f7;color:#16304c;font:16px "Malgun Gothic",sans-serif}
+main{max-width:1560px;margin:auto;padding:28px}h1{margin:0 0 12px;font-size:28px}p{line-height:1.65}
+nav{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:22px 0}select,button{font:inherit;padding:10px;border:1px solid #becbd9;border-radius:6px;background:white;color:#16304c}
+select{min-width:320px}button{cursor:pointer}button:disabled{opacity:.4;cursor:default}figure{margin:0}img{display:block;width:100%;height:auto;border-radius:4px}
+table{border-collapse:collapse;width:100%;background:white;margin-top:20px}th,td{padding:12px;border-bottom:1px solid #dce5ef;text-align:right}td:first-child,th:first-child{text-align:left}
+.table-wrap{overflow-x:auto}.meta{margin:15px 0;color:#405a76}.note{color:#50657c;font-size:14px}.crop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:28px}.crop-grid img{width:auto;max-width:100%;max-height:512px;margin:auto}.crop-grid figcaption{text-align:center;margin-bottom:12px}.crop-grid figure{background:white;padding:16px}.links{display:flex;gap:20px}a{color:#145cbd}
+@media(max-width:700px){main{padding:16px}select{min-width:0;max-width:100%}.crop-grid{grid-template-columns:1fr}h1{font-size:23px}}
+</style>
+<main>
+<h1>changed_v3 · P1/P2/P3 · 가로 256 × 세로 512</h1>
+<p>72개 촬영본의 시편 ROI 중심에 맞춘 원본 크롭과 저장 GT입니다. 색상 실선은 새 영역, 흰 점선은 기존 256×256 영역입니다.</p>
+<nav aria-label="촬영본 선택"><button id="prev" type="button">이전</button><select id="capture" aria-label="Case·측·시편 또는 샷 선택"></select><button id="next" type="button">다음</button><span id="counter"></span></nav>
+<div class="meta" id="meta"></div>
+<figure><img id="overview" alt="원본 촬영본과 P1/P2/P3 크롭 위치 및 GT 마스크"></figure>
+<div class="table-wrap"><table><thead><tr><th>포인트</th><th>새 영역 [x0,y0,x1,y1)</th><th>실제 픽셀 중심</th><th>중심 Δy</th><th>Exposure 픽셀</th><th>새 GT 함침율</th><th>기존 256×256</th><th>차이(pp)</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="crop-grid" id="overlays"></div>
+<p class="note">함침율 = 100 × (1 − Exposure(alpha&gt;0) 픽셀 수 / 131,072). 각 새 영역 전체 픽셀을 사용합니다. 표시용 그림만 축소하며 저장 크롭과 마스크는 원본 해상도입니다. GT 출처는 changed_v3이며 Project13 Gold를 사용하지 않았습니다.</p>
+<p class="links"><a href="../point_measurements.csv">좌표·GT 측정값 CSV</a><a href="../manifest.json">Manifest</a><a href="../verification.json">검증 결과</a></p>
+</main>
+<script type="application/json" id="data">__DATA__</script>
+<script>
+const data=JSON.parse(document.getElementById('data').textContent);
+const capture=document.getElementById('capture');
+const prev=document.getElementById('prev');
+const next=document.getElementById('next');
+data.records.forEach((r,i)=>{const o=document.createElement('option');o.value=i;o.textContent=r.label+' · Task '+r.task_id;capture.appendChild(o)});
+function show(index){
+ capture.value=index;const r=data.records[index];
+ document.getElementById('counter').textContent=(index+1)+' / '+data.records.length;
+ document.getElementById('meta').textContent=r.label+' · Project '+r.project_id+' / Task '+r.task_id+' / Annotation '+r.annotation_ids.join(', ')+' · '+r.split+' · 회전 '+r.rotation+'°';
+ document.getElementById('overview').src=r.figure;
+ const rows=document.getElementById('rows');rows.replaceChildren();
+ const overlays=document.getElementById('overlays');overlays.replaceChildren();
+ r.points.forEach(p=>{
+  const tr=document.createElement('tr');
+  const values=[p.measurement_point,JSON.stringify(p.xyxy_exclusive),JSON.stringify(p.center_pixel_coordinates),p.center_shift_xy[1].toFixed(1)+'px',p.label_pixels.toLocaleString(),p.gt_impregnation_pct.toFixed(4)+'%',p.parent_gt_impregnation_pct.toFixed(4)+'%',(p.gt_change_pp>=0?'+':'')+p.gt_change_pp.toFixed(4)];
+  values.forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});rows.appendChild(tr);
+  const figure=document.createElement('figure');const label=document.createElement('figcaption');label.textContent=p.measurement_point+' · GT 미함침 오버레이';
+  const image=document.createElement('img');image.src='../'+p.overlay;image.alt=r.label+' '+p.measurement_point+' GT 오버레이';
+  figure.append(label,image);overlays.appendChild(figure);
+ });
+ prev.disabled=index===0;next.disabled=index===data.records.length-1;
+}
+capture.addEventListener('change',()=>show(Number(capture.value)));
+prev.addEventListener('click',()=>show(Math.max(0,Number(capture.value)-1)));
+next.addEventListener('click',()=>show(Math.min(data.records.length-1,Number(capture.value)+1)));
+show(0);
+</script>
+</html>

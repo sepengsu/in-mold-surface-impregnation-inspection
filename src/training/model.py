@@ -18,11 +18,12 @@ class DoubleConv(nn.Sequential):
 
 
 class UNet(nn.Module):
-    def __init__(self, base_channels=32):
+    def __init__(self, base_channels=32, activation_checkpointing=False):
         super().__init__()
         if base_channels < 8 or base_channels % 8:
             raise ValueError("base_channels must be a positive multiple of 8.")
         widths = [base_channels * 2**i for i in range(5)]
+        self.activation_checkpointing = activation_checkpointing
         self.encoders = nn.ModuleList(
             DoubleConv(1 if i == 0 else widths[i - 1], width)
             for i, width in enumerate(widths)
@@ -34,13 +35,18 @@ class UNet(nn.Module):
         self.head = nn.Conv2d(widths[0], 1, 1)
 
     def forward(self, x):
+        def apply(block, value):
+            if self.activation_checkpointing and self.training and torch.is_grad_enabled():
+                from torch.utils.checkpoint import checkpoint
+                return checkpoint(block, value, use_reentrant=False)
+            return block(value)
         skips = []
         for i, encoder in enumerate(self.encoders):
-            x = encoder(x if i == 0 else F.max_pool2d(x, 2))
+            x = apply(encoder, x if i == 0 else F.max_pool2d(x, 2))
             skips.append(x)
         for decoder, skip in zip(self.decoders, reversed(skips[:-1])):
             x = F.interpolate(x, size=skip.shape[-2:], mode="bilinear", align_corners=False)
-            x = decoder(torch.cat((skip, x), dim=1))
+            x = apply(decoder, torch.cat((skip, x), dim=1))
         return self.head(x)
 
 
@@ -51,19 +57,23 @@ class SegmentationMetrics:
         self.loss_sum = self.mae_sum = 0.0
 
     @torch.no_grad()
-    def update(self, logits, targets, loss):
+    def update(self, logits, targets, loss, valid=None):
         predictions = logits.sigmoid() >= self.threshold
         actual = targets > 0.5
+        valid = torch.ones_like(actual) if valid is None else valid.bool()
+        count = valid.sum((1,2,3))
+        usable = count > 0
+        predictions, actual = predictions & valid, actual & valid
         self.tp += int((predictions & actual).sum().item())
         self.fp += int((predictions & ~actual).sum().item())
         self.fn += int((~predictions & actual).sum().item())
-        batch = targets.shape[0]
+        batch = int(usable.sum().item())
         self.samples += batch
         self.loss_sum += float(loss) * batch
         # 100*(1-Exposure fraction): absolute difference in percentage points.
-        pred_rate = 100 * (1 - predictions.float().mean((1, 2, 3)))
-        true_rate = 100 * (1 - actual.float().mean((1, 2, 3)))
-        self.mae_sum += (pred_rate - true_rate).abs().sum().item()
+        pred_rate = 100 * (1 - predictions.sum((1,2,3))/count.clamp_min(1))
+        true_rate = 100 * (1 - actual.sum((1,2,3))/count.clamp_min(1))
+        self.mae_sum += (pred_rate[usable] - true_rate[usable]).abs().sum().item()
 
     def compute(self):
         if not self.samples:

@@ -1,0 +1,81 @@
+changed_v3 A/B/C/D 실행 안내
+
+이번 코드 작성에서는 실제 학습, OOF, 모델 추론, calibration, sweep을 실행하지 않는다.
+기존 v2 데이터/체크포인트/출력과 legacy C=사람 검수 라벨 조건은 보존한다.
+새 C는 CL 후보의 loss weight=0.5이며 모든 B/C/D가 동일 common 후보를 사용한다.
+
+PowerShell 공통:
+  Set-Location D:\Code\vision_data
+  $run = '.\src\Namrc\run_changed_v3.ps1'
+  $exp = 'D:\Code\vision_data\analysis\confident\changed_v3_softweight_MY_RUN'
+
+검증과 준비만 (학습 없음):
+  & $run -Stage prepare -Output $exp
+  & $run -Stage audit-plan -Experiment $exp
+
+현재 strict Gold Case 제외는 eligible=0이다. audit/blocker.json을 기록한다.
+Gold가 20개 Case를 모두 포함하므로 현재 Train에서 독립 Audit를 만들 수 없다.
+새 독립 Case 자료 또는 사용자가 명시적으로 승인한 범위 예외가 필요하다.
+이 제약 때문에 후보와 B/C/D를 근거 없이 자동 진행하는 all 단계는 제공하지 않는다.
+예외가 나중에 승인된 경우에만 별도 JSON에 다음을 기록한다:
+  approved: true
+  allow_gold_case_overlap: true
+  human_user_instruction: 실제 사용자 지시 전문
+예외를 코드가 임의로 승인하거나 Gold 픽셀을 Audit GT로 사용하는 것은 금지한다.
+예외에서도 동일 Gold 이미지는 제외하고 Dev/Check Case를 분리한다.
+동일 Case Audit를 허용한 결과는 Gold와 완전히 독립적인 정책 검증이라고 부르지 않는다.
+
+추후 학습/OOF 실행을 원할 때 사용자가 직접 실행할 명령 (이번 작업에서는 실행 안 함):
+  & $run -Stage oof -Experiment $exp
+  & $run -Stage issues -Experiment $exp
+  & $run -Stage audit-plan -Experiment $exp -AuditScopeAuthorization '승인된_범위_예외.json'
+
+audit/review.template.json을 복사해 review.json을 만든다.
+CL 표시를 보기 전에 audit/dev 및 check의 원본 image.png 전체를 독립 검수한다.
+각 tile의 reviewed=true, reviewer, judged_before_cl_display=true,
+human_alpha_mask/sha256, uncertain_mask/sha256을 기록한다.
+확실한 Exposure는 alpha>0, 불확실 픽셀은 별도 uncertain mask >0.
+타일 순서/선정 정보는 변경하지 않는다. 사람 마스크는 학습 target으로 쓰지 않는다.
+60타일은 초기 표본안일 뿐 충분성을 보장하지 않는다. 층화 표본은 표본 결과로만 보고한다.
+
+Dev에서 공통 방향 규칙을 정한다. v3_policy.template.json을 복사해
+approved/reviewer와 규칙을 실제 근거로 채운다. 0.9는 운영 목표 예시이지 검증된 최적값이 아니다.
+Check를 보기 전에 모든 규칙과 운영 목표를 고정한다. 양 방향 enabled=false는 0후보를 그대로 보고한다.
+
+  & $run -Stage audit-evaluate -Experiment $exp -Partition dev -AuditReview 'review.json' -Policy 'policy_draft.json'
+  & $run -Stage freeze-policy -Experiment $exp -Policy 'policy_draft.json'
+  & $run -Stage audit-evaluate -Experiment $exp -Partition check -AuditReview 'review.json'
+  & $run -Stage candidates -Experiment $exp
+
+Check 결과로 규칙을 고친 뒤 같은 Check를 다시 쓰지 않는다. 부족하면 새 독립 검증 설계가 필요하다.
+Case bootstrap을 사용하며 픽셀 독립성을 가정하지 않는다. 불확실 후보는 보수적 gate에서 실패로 센다.
+경계/작은 구조를 통째로 제외하지 않는다. 확률만 높다고 안전하다고 보지 않는다.
+common/per_tile.csv와 manifest.json에 raw/common 수, 제거/추가 방향, 해시, 0후보를 저장한다.
+
+명시적 최종 학습 (한 모델씩, 기존 checkpoint에서 이어 학습하지 않음):
+  & $run -Stage train -Experiment $exp -Arms A
+  & $run -Stage train -Experiment $exp -Arms B,C,D
+또는 검증된 common이 있을 때 & $run -Stage train -Experiment $exp
+동일 seed별 초기화와 데이터 순서, UNet32, AdamW, BCE+Dice, augmentation basic, 균등 샘플링.
+기본 final seeds=42,43,44; 하나의 고정 OOF/후보로 최종 학습 변동성만 비교한다.
+선택은 v3 Validation Dice만, scheduler는 Validation loss만. Test/Gold 선택 금지.
+기본 RAM/VRAM 각4096MiB, workers=0, pin_memory=false, persistent_workers=false.
+기본 batch=16, 최대500 epochs, patience20. 자원 guard 실패시 같은 frozen 설정을 몰래 바꾸지 않는다.
+용량 변경이 필요하면 새 config를 복사하고 새 출력에서 전체 비교 설정을 함께 고정한다.
+완료 fit만 해시 검증 후 재사용하며 미완료 fit은 덮어쓰지 않는다.
+
+모든 모델 완료 후 최종 Gold 추론만:
+  & $run -Stage evaluate -Experiment $exp
+Gold72 동일 최신 저장 완료 annotation을 freeze하고 256x256 전체, threshold=.5, TTA/augmentation 없음.
+per_image.csv/json에 864행(4조건×3seed×72장), 864개 GT/예측/overlay/확률을 저장한다.
+by_subset.csv: Gold전체와 Train51/Validation9/Test12를 seed별 분리.
+by_case_side.csv, by_case_side_specimen_or_shot.csv: Case/측/시편/샷. Case14 이동측 샷1136/1138/1140 유지.
+summary.json: pixel pooled/이미지평균/seed평균·표준편차, paired Case bootstrap.
+Gold전체는 독립 Test가 아니다. Test12도 이미 분석된 3Case이며 새 확인용 잠금 외부 평가가 없다.
+Dice/MAE를 함께 보고 Recall/부호 편향/Case 일관성을 확인한다. 비열등성 margin은 지정하지 않는다.
+
+추후 부실험은 별도 namespace/config로 설계:
+CL vs Case/클래스/수/가능하면 덩어리 크기를 맞춘 무작위 후보,
+held-out Case를 보정 fitting에서도 제외한 OOF calibration,
+동일 사람 검수 예산의 CL 우선 vs 무작위 검수.
+주 실험 C의 정의나 teacher architecture/loss/augmentation을 동시에 바꾸지 않는다.

@@ -56,9 +56,20 @@ def load_tiles(dataset, position="all"):
             image, alpha = read_gray(image_path), read_gray(mask_path)
             if image.shape != (256, 256) or alpha.shape != image.shape:
                 raise ValueError(f"Expected aligned 256 x 256 tiles: {image_path}")
-            if np.any(image == 0):
+            encoding = manifest['summary'].get('mask_encoding', {})
+            valid_value = tile.get('valid_mask')
+            valid = (read_gray(relative_file(root, valid_value)) > 0 if valid_value else
+                     np.ones(alpha.shape, dtype=bool))
+            if valid.shape != alpha.shape:
+                raise ValueError('Tile validity shape mismatch.')
+            ignore = encoding.get('ignore_value')
+            if ignore is not None:
+                valid &= alpha != ignore
+            if np.any((image == 0) & valid):
                 raise ValueError(f"Black pixels found in interior tile: {image_path}")
-            foreground = int(np.count_nonzero(alpha > 0))
+            foreground_mask = (alpha == encoding['defect_value'] if encoding.get('defect_value') is not None
+                               and encoding.get('rule') != 'positive_is_defect' else alpha > 0)
+            foreground = int(np.count_nonzero(foreground_mask & valid))
             if foreground != tile["label_pixels"]:
                 raise ValueError(f"Mask pixel count differs from manifest: {mask_path}")
             records.append({
@@ -69,6 +80,8 @@ def load_tiles(dataset, position="all"):
                 "capture": source["capture"], "position": source["position"],
                 "task_id": source["task_id"], "xyxy": tile["xyxy_exclusive"],
                 "label_pixels": foreground,
+                **({'valid_mask': valid_value, 'valid_mask_sha256': hashlib.sha256(relative_file(root,valid_value).read_bytes()).hexdigest()}
+                   if valid_value else {}),
                 **({"measurement_point": tile.get("measurement_point"),
                     "grid_index": tile.get("grid_index"),
                     "alignment": manifest["summary"]["settings"]["alignment"],

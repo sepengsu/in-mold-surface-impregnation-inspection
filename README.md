@@ -48,6 +48,7 @@ Source code is split by responsibility:
 - `src/segmentation/`: pseudo segmentation, YOLO packaging, and Roboflow upload preparation.
 - `src/training/`: U-Net Exposure segmentation, case-level data splits, and PowerShell training.
 - `src/inference/`: trained U-Net predictions, comparison PNGs, and a local HTML gallery.
+- `src/Namrc/`: disk-backed TRAIN-only case-held-out Confident Learning with A/B/C/D segmentation comparisons and memory guards. See [PowerShell workflow](src/Namrc/README.md).
 - `tests/`: unit, integration, and PowerShell workflow tests.
 - `config/`: runtime configuration such as `roi_gabor_boundary.yaml`.
 
@@ -132,3 +133,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\src\training\run_impro
 
 This runs baseline, sampling-only, loss-only, and combined settings, then visualizes
 the validation-selected model. See [improvement experiments and PowerShell usage](docs/training_improvements.md).
+
+Compare ordinary segmentation architectures and sizes on the complete frozen `changed_v2` split:
+
+```powershell
+.\src\training\run_segmentation_benchmark.ps1 -InstallDependencies -Open
+```
+
+This compares 15 from-scratch U-Net, U-Net++, FPN, DeepLabV3+ and SegFormer configurations
+with the original labels, sequential processes and RAM/VRAM guards. See
+[model IDs, memory checks and resume commands](src/training/SEGMENTATION_BENCHMARK.md).

@@ -1,0 +1,43 @@
+{
+  "protocol": "changed_v3_fine_exposure_v1",
+  "data": "data/changed_v3",
+  "gold": "data/gold",
+  "baseline_experiment": "analysis/confident/changed_v3_softweight_ready_20261013",
+  "seeds": [42, 43, 44],
+  "epochs": 500,
+  "patience": 20,
+  "batch_size": 16,
+  "base_channels": 32,
+  "learning_rate": 0.001,
+  "device": "cuda",
+  "amp": true,
+  "workers": 0,
+  "pin_memory": false,
+  "persistent_workers": false,
+  "gradient_accumulation_steps": 1,
+  "ram_budget_mib": 4096,
+  "vram_budget_mib": 4096,
+  "min_free_ram_mib": 1024,
+  "min_free_vram_mib": 0,
+  "threshold": 0.5,
+  "connectivity": 8,
+  "component_iou_threshold": 0.25,
+  "component_matching": "descending IoU greedy one-to-one; ties GT ID then prediction ID",
+  "auxiliary_loss_weights": [0.25, 0.25, 0.5],
+  "noise_enabled": false,
+  "conditions": {
+    "M0": {"model": "unet4", "loss": "bce_dice", "augmentation": "Aug0"},
+    "M1": {"model": "unet4", "loss": "bce_tversky", "augmentation": "Aug0"},
+    "M2": {"model": "unet3", "loss": "bce_dice", "augmentation": "Aug0"},
+    "M2S": {"model": "unet3_silu", "loss": "bce_dice", "augmentation": "Aug0"},
+    "M3": {"model": "resunet3", "loss": "bce_dice", "augmentation": "Aug0"},
+    "M4a": {"model": "nested3", "loss": "bce_dice", "augmentation": "Aug0"},
+    "M4b": {"model": "nested3_ds", "loss": "bce_dice", "augmentation": "Aug0"}
+  },
+  "groups": {
+    "loss": ["M0", "M1"],
+    "architecture": ["M0", "M2", "M2S", "M3", "M4a", "M4b"]
+  },
+  "selection": "Human selects one tested condition using frozen Validation reports only; report precision/MAE/micro-recall trade-offs. No automatic Gold ranking.",
+  "bootstrap_repetitions": 2000
+}

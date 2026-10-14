@@ -12,12 +12,22 @@ wheels/
 outputs/training/
 outputs/inference/
 outputs/releases/
+analysis/confident/
 
 # Local secrets
 .env
 config/roboflow_api_upload.yaml
+config/label_studio_project9.local.json
+.ipynb_checkpoints/
 
 # Dataset files
 data/*
 !data/Mono/
 !data/Mono/**
+
+# analysis
+analysis/
+temp/
+tests/
+outputs/
+experiments/
